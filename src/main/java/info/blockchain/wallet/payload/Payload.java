@@ -145,8 +145,7 @@ public class Payload {
         List<LegacyAddress> addrs = new ArrayList<LegacyAddress>();
 
         for(LegacyAddress legacyAddress : legacyAddresses) {
-            if(legacyAddress.getTag() == PayloadFactory.NORMAL_ADDRESS &&
-               !legacyAddress.isWatchOnly()) {
+            if(legacyAddress.getTag() == PayloadFactory.NORMAL_ADDRESS) {
                 addrs.add(legacyAddress);
             }
         }
@@ -180,8 +179,7 @@ public class Payload {
         List<String> addrs = new ArrayList<String>();
 
         for(LegacyAddress legacyAddress : legacyAddresses) {
-            if(legacyAddress.getTag() == PayloadFactory.NORMAL_ADDRESS &&
-               !legacyAddress.isWatchOnly()) {
+            if(legacyAddress.getTag() == PayloadFactory.NORMAL_ADDRESS) {
               addrs.add(legacyAddress.getAddress());
             }
         }
