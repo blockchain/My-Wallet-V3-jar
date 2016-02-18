@@ -534,6 +534,11 @@ public class MultiAddrFactory	{
                         if(containedLegacyTx == null) {
                             containedLegacyTx = new ArrayList<Tx>();
                         }
+
+                        if(watchOnlyLegacyAddresses.contains(address)){
+                            tx.setIsWatchOnly(true);
+                        }
+
                         containedLegacyTx.add(tx);
                         address_legacy_txs.put(address, containedLegacyTx);
                     }
