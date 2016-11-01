@@ -81,7 +81,7 @@ public class WebUtil {
 //					Log.d("postURL", "return code " + error);
                 }
                 
-                if (requestRetry > 1) {
+                if (ii == requestRetry - 1) {
                     Thread.sleep(5000);
                 }
             } catch (Exception e) {
