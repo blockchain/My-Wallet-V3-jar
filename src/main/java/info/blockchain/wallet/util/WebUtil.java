@@ -80,8 +80,10 @@ public class WebUtil {
                     error = IOUtils.toString(connection.getErrorStream(), "UTF-8");
 //					Log.d("postURL", "return code " + error);
                 }
-
-                Thread.sleep(5000);
+                
+                if (ii == requestRetry - 1) {
+                    Thread.sleep(5000);
+                }
             } catch (Exception e) {
                 throw new Exception("Network error" + e.getMessage());
             } finally {
