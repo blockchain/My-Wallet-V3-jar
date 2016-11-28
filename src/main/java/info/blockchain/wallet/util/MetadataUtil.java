@@ -59,7 +59,7 @@ public class MetadataUtil {
     }
 
     private static byte[] magicHash(byte[] message) {
-        byte[] messageBytes = Utils.formatMessageForSigning(new String(Base64.encode(message)));
+        byte[] messageBytes = Utils.formatMessageForSigning(Base64Util.encodeBase64String(message));
         return Sha256Hash.hashTwice(messageBytes);
     }
 
@@ -136,9 +136,7 @@ public class MetadataUtil {
         hash.update(keys.get(0));
         hash.update(keys.get(1));
 
-        byte[] derivedKey = hash.digest();
-
-        return derivedKey;
+        return hash.digest();
     }
 
     public static String encryptFor(ECKey myKey, String theirXpub, String message) throws Exception {
@@ -158,9 +156,8 @@ public class MetadataUtil {
         System.out.println("Shared Secret: "+ Hex.toHexString(secret));
 
         System.out.println("Encrypting message with secret...");
-        String encryptedMessage = AESUtil.encrypt(message, new CharSequenceX(Hex.toHexString(secret)), 65536);
 
-        return encryptedMessage;
+        return AESUtil.encrypt(message, new CharSequenceX(Hex.toHexString(secret)), 65536);
     }
 
     public static String decryptFrom(DeterministicKey myKey, String theirXpub, String message) throws Exception {
