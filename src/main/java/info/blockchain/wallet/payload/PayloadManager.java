@@ -575,10 +575,19 @@ public class PayloadManager {
     }
 
     public boolean addLegacyAddress(LegacyAddress legacyAddress) throws Exception {
+
         List<LegacyAddress> updatedLegacyAddresses = payload.getLegacyAddressList();
         updatedLegacyAddresses.add(legacyAddress);
         payload.setLegacyAddressList(updatedLegacyAddresses);
-        return savePayloadToServer();
+        
+        boolean success = savePayloadToServer();
+
+        if(!success){
+            updatedLegacyAddresses.remove(legacyAddress);
+            payload.setLegacyAddressList(updatedLegacyAddresses);
+        }
+
+        return success;
     }
 
     ECKey getRandomECKey() throws Exception{
