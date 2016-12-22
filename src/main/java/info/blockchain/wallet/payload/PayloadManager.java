@@ -9,7 +9,12 @@ import info.blockchain.api.WalletPayload;
 import info.blockchain.bip44.Address;
 import info.blockchain.bip44.Chain;
 import info.blockchain.bip44.Wallet;
-import info.blockchain.wallet.exceptions.*;
+import info.blockchain.wallet.exceptions.AccountLockedException;
+import info.blockchain.wallet.exceptions.DecryptionException;
+import info.blockchain.wallet.exceptions.HDWalletException;
+import info.blockchain.wallet.exceptions.InvalidCredentialsException;
+import info.blockchain.wallet.exceptions.ServerConnectionException;
+import info.blockchain.wallet.exceptions.UnsupportedVersionException;
 import info.blockchain.wallet.multiaddr.MultiAddrFactory;
 import info.blockchain.wallet.payment.data.SpendableUnspentOutputs;
 import info.blockchain.wallet.send.MyTransactionOutPoint;
@@ -583,8 +588,51 @@ public class PayloadManager {
         boolean success = savePayloadToServer();
 
         if(!success){
+            //revert on sync fail
             updatedLegacyAddresses.remove(legacyAddress);
             payload.setLegacyAddressList(updatedLegacyAddresses);
+        }
+
+        return success;
+    }
+
+    /**
+     * // TODO: 22/12/2016 moved here from android. Could benefit from a refactor
+     * Sets a private key for a {@link LegacyAddress}
+     *
+     * @param key            The {@link ECKey} for the address
+     * @param secondPassword An optional double encryption password
+     */
+    public boolean setKeyForLegacyAddress(ECKey key, @Nullable CharSequenceX secondPassword) throws Exception {
+
+        String address = key.toAddress(MainNetParams.get()).toString();
+        int index = payload.getLegacyAddressStringList().indexOf(address);
+
+        LegacyAddress legacyAddress = payload.getLegacyAddressList().get(index);
+
+        // If double encrypted, save encrypted in payload
+        if (!payload.isDoubleEncrypted()) {
+            legacyAddress.setEncryptedKeyBytes(key.getPrivKeyBytes());
+        } else {
+            String encryptedKey = Base58.encode(key.getPrivKeyBytes());
+            String encrypted2 = DoubleEncryptionFactory.getInstance().encrypt(encryptedKey,
+                    payload.getSharedKey(),
+                    secondPassword != null ? secondPassword.toString() : null,
+                    payload.getOptions().getIterations());
+
+            legacyAddress.setEncryptedKey(encrypted2);
+        }
+
+        legacyAddress.setWatchOnly(false);
+
+        setPayload(payload);
+
+        boolean success =  savePayloadToServer();
+
+        if(!success){
+            //revert on sync fail
+            legacyAddress.setEncryptedKey(null);
+            legacyAddress.setWatchOnly(true);
         }
 
         return success;
