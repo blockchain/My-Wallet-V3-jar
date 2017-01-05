@@ -18,7 +18,7 @@ tasks.withType(JavaCompile) {
 repositories {
 
     maven {
-        url nexusUrl + '/repository/maven-public/'
+        url 'https://nexus.dev.blockchain.info' + '/repository/maven-public/'
         credentials(PasswordCredentials) {
             username nexusUsername
             password nexusPassword
