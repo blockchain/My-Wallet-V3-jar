@@ -5,6 +5,7 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
 import info.blockchain.api.ExternalEntropy;
+import info.blockchain.api.PersistentUrls;
 import info.blockchain.api.WalletPayload;
 import info.blockchain.bip44.Address;
 import info.blockchain.bip44.Chain;
@@ -15,6 +16,7 @@ import info.blockchain.wallet.exceptions.HDWalletException;
 import info.blockchain.wallet.exceptions.InvalidCredentialsException;
 import info.blockchain.wallet.exceptions.ServerConnectionException;
 import info.blockchain.wallet.exceptions.UnsupportedVersionException;
+import info.blockchain.wallet.metadata.MetadataNodeFactory;
 import info.blockchain.wallet.multiaddr.MultiAddrFactory;
 import info.blockchain.wallet.payment.data.SpendableUnspentOutputs;
 import info.blockchain.wallet.send.MyTransactionOutPoint;
@@ -29,7 +31,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.Base58;
 import org.bitcoinj.core.ECKey;
-import org.bitcoinj.params.MainNetParams;
+import org.bitcoinj.crypto.DeterministicKey;
 import org.json.JSONObject;
 
 import java.security.SecureRandom;
@@ -64,12 +66,15 @@ public class PayloadManager {
     private HDPayloadBridge hdPayloadBridge;
     private info.blockchain.bip44.Wallet wallet;
     private PrivateKeyFactory privateKeyFactory;
+    private WalletPayload walletApi;
+    private MetadataNodeFactory metadataNodeFactory;
 
     private PayloadManager() {
         hdPayloadBridge = new HDPayloadBridge();
         payload = new Payload();
         cached_payload = "";
         privateKeyFactory = new PrivateKeyFactory();
+        walletApi = new WalletPayload();
     }
 
     /**
@@ -114,7 +119,7 @@ public class PayloadManager {
 
         String walletData;
         try {
-            walletData = new WalletPayload().fetchWalletData(guid, sharedKey);
+            walletData = walletApi.fetchWalletData(guid, sharedKey);
         } catch (Exception e) {
 
             e.printStackTrace();
@@ -261,7 +266,7 @@ public class PayloadManager {
     /**
      * Write to current client payload to cache.
      */
-    public void cachePayload(Payload payload) throws Exception{
+    public void cachePayload(Payload payload) throws Exception {
         cached_payload = payload.toJson().toString();
     }
 
@@ -307,7 +312,7 @@ public class PayloadManager {
                         payload.getDoubleEncryptionPbkdf2Iterations());
 
                 return hdPayloadBridge.decryptWatchOnlyWallet(payload, decrypted_hex);
-            }catch (Exception e){
+            } catch (Exception e) {
                 throw new DecryptionException(e.getMessage());
             }
 
@@ -416,15 +421,34 @@ public class PayloadManager {
     public String getNextReceiveAddress(int accountIndex) throws AddressFormatException {
 
         Account account = payload.getHdWallet().getAccounts().get(accountIndex);
-        int receiveAddressIndex = findNextReservedReceiveAddressIndex(account, account.getIdxReceiveAddresses());
+        int receiveAddressIndex = findNextUnreservedReceiveAddressIndex(account, account.getIdxReceiveAddresses());
 
         String xpub = getXpubFromAccountIndex(accountIndex);
         return hdPayloadBridge.getAddressAt(xpub, Chain.RECEIVE_CHAIN, receiveAddressIndex).getAddressString();
     }
 
-    private int findNextReservedReceiveAddressIndex(Account account, int addressPosition) {
+    /**
+     * Allows you to generate a receive address at an arbitrary number of positions on the chain
+     * from the next valid unused address. For example, the passing 5 as the position will generate
+     * an address which correlates with the next available address + 5 positions.
+     *
+     * @param accountIndex The index of the account you wish to generate addresses from
+     * @param position     Represents how many positions on the chain beyond what is already used
+     *                     that you wish to generate
+     * @return A bitcoin address
+     */
+    public String getReceiveAddressAtPosition(int accountIndex, int position) throws AddressFormatException {
+
+        Account account = payload.getHdWallet().getAccounts().get(accountIndex);
+        int receiveAddressIndex = findNextUnreservedReceiveAddressIndex(account, account.getIdxReceiveAddresses() + position);
+
+        String xpub = getXpubFromAccountIndex(accountIndex);
+        return hdPayloadBridge.getAddressAt(xpub, Chain.RECEIVE_CHAIN, receiveAddressIndex).getAddressString();
+    }
+
+    private int findNextUnreservedReceiveAddressIndex(Account account, int addressPosition) {
         return account.getAddressLabels().containsKey(addressPosition)
-                ? findNextReservedReceiveAddressIndex(account, addressPosition + 1) : addressPosition;
+                ? findNextUnreservedReceiveAddressIndex(account, addressPosition + 1) : addressPosition;
     }
 
     public String getXpubFromAccountIndex(int accountIdx) {
@@ -571,7 +595,7 @@ public class PayloadManager {
 
         final LegacyAddress legacyAddress = new LegacyAddress();
         legacyAddress.setEncryptedKey(encryptedKey);
-        legacyAddress.setAddress(ecKey.toAddress(MainNetParams.get()).toString());
+        legacyAddress.setAddress(ecKey.toAddress(PersistentUrls.getInstance().getCurrentNetworkParams()).toString());
         legacyAddress.setCreatedDeviceName(deviceName);
         legacyAddress.setCreated(System.currentTimeMillis());
         legacyAddress.setCreatedDeviceVersion(deviceVersion);
@@ -605,7 +629,7 @@ public class PayloadManager {
      */
     public boolean setKeyForLegacyAddress(ECKey key, @Nullable CharSequenceX secondPassword) throws Exception {
 
-        String address = key.toAddress(MainNetParams.get()).toString();
+        String address = key.toAddress(PersistentUrls.getInstance().getCurrentNetworkParams()).toString();
         int index = payload.getLegacyAddressStringList().indexOf(address);
 
         LegacyAddress legacyAddress = payload.getLegacyAddressList().get(index);
@@ -638,11 +662,11 @@ public class PayloadManager {
         return success;
     }
 
-    ECKey getRandomECKey() throws Exception{
+    ECKey getRandomECKey() throws Exception {
 
         byte[] data = new ExternalEntropy().getRandomBytes();
 
-        if (data == null)throw new Exception("ExternalEntropy.getRandomBytes failed.");
+        if (data == null) throw new Exception("ExternalEntropy.getRandomBytes failed.");
 
         byte[] rdata = new byte[32];
         SecureRandom random = new SecureRandom();
@@ -660,15 +684,23 @@ public class PayloadManager {
         return ecKey;
     }
 
-    public String getHDSeed() {
+    public byte[] getHDSeed() {
+        return wallet.getSeed();
+    }
+
+    public String getHDSeedHex() {
         return wallet.getSeedHex();
+    }
+
+    public DeterministicKey getMasterKey() {
+        return wallet.getMasterKey();
     }
 
     public String[] getMnemonic(String secondPassword) throws Exception {
 
         Wallet wallet = getDecryptedWallet(secondPassword);
 
-        if (wallet == null)throw new Exception("getDecryptedWallet returned null.");
+        if (wallet == null) throw new Exception("getDecryptedWallet returned null.");
 
         String mnemonic = wallet.getMnemonic();
 
@@ -736,4 +768,36 @@ public class PayloadManager {
         return getXpubToAccountIndexMap().inverse();
     }
 
+    public void unregisterMdid(String guid, String sharedKey, ECKey node) throws Exception {
+        walletApi.unregisterMdid(node, guid, sharedKey);
+    }
+
+    public void registerMdid(String guid, String sharedKey, ECKey node) throws Exception {
+        walletApi.registerMdid(node, guid, sharedKey);
+    }
+
+    public void loadNodes(String guid, String sharedKey, String walletPassword, @Nullable String secondPassword) throws Exception {
+
+        metadataNodeFactory = new MetadataNodeFactory(guid, sharedKey, walletPassword);
+
+        boolean usable = metadataNodeFactory.isMetadataUsable();
+        if(!usable){
+
+            Wallet wallet;
+            if (payload.isDoubleEncrypted()) {
+                wallet = getDecryptedWallet(secondPassword);
+            } else {
+                wallet = this.wallet;
+            }
+
+            boolean success = metadataNodeFactory.saveMetadataHdNodes(wallet.getMasterKey());
+            if(!success){
+                throw new Exception("All Metadata nodes might not have saved.");
+            }
+        }
+    }
+
+    public MetadataNodeFactory getMetadataNodeFactory() {
+        return metadataNodeFactory;
+    }
 }

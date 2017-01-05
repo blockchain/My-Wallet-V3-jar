@@ -1,5 +1,8 @@
 package info.blockchain.wallet.payload;
 
+import info.blockchain.BlockchainFramework;
+import info.blockchain.FrameworkInterface;
+import info.blockchain.util.RestClient;
 import info.blockchain.wallet.exceptions.InvalidCredentialsException;
 import info.blockchain.wallet.exceptions.UnsupportedVersionException;
 import info.blockchain.wallet.util.CharSequenceX;
@@ -12,6 +15,10 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.util.ArrayList;
+
+import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
+import retrofit2.Retrofit;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
@@ -32,10 +39,47 @@ public class PayloadManagerTest {
     @Before
     public void setUp() throws Exception {
 
+        //Set environment
+//        PersistentUrls.getInstance().setCurrentEnvironment(PersistentUrls.Environment.DEV);
+//        PersistentUrls.getInstance().setCurrentApiUrl("https://api.dev.blockchain.info/");
+//        PersistentUrls.getInstance().setCurrentServerUrl("https://explorer.dev.blockchain.info/");
+
+        BlockchainFramework.init(new FrameworkInterface() {
+            @Override
+            public Retrofit getRetrofitApiInstance() {
+
+                HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor();
+                loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+
+                OkHttpClient okHttpClient = new OkHttpClient.Builder()
+//                        .addInterceptor(loggingInterceptor)//Extensive logging
+                        .build();
+
+                return RestClient.getRetrofitInstance(okHttpClient);
+            }
+
+            @Override
+            public Retrofit getRetrofitServerInstance() {
+                return null;
+            }
+        });
+
         MockitoAnnotations.initMocks(this);
 
         payloadManager = PayloadManager.getInstance();
         payload = payloadManager.createHDWallet(password, label);
+
+        BlockchainFramework.init(new FrameworkInterface() {
+            @Override
+            public Retrofit getRetrofitApiInstance() {
+                return RestClient.getRetrofitInstance(new OkHttpClient());
+            }
+
+            @Override
+            public Retrofit getRetrofitServerInstance() {
+                return null;
+            }
+        });
     }
 
     @After
