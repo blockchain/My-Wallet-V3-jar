@@ -15,13 +15,17 @@ tasks.withType(JavaCompile) {
 	options.encoding = 'UTF-8'
 }
 
+def _nexusUrl = hasProperty('nexusUrl') ? nexusUrl : System.getenv('nexusUrl')
+def _nexusUsername = hasProperty('nexusUsername') ? nexusUsername : System.getenv('nexusUsername')
+def _nexusPassword = hasProperty('nexusPassword') ? nexusPassword : System.getenv('nexusPassword')
+
 repositories {
 
     maven {
-        url nexusUrl + '/repository/maven-public/'
+        url _nexusUrl + '/repository/maven-public/'
         credentials(PasswordCredentials) {
-            username nexusUsername
-            password nexusPassword
+            username _nexusUsername
+            password _nexusPassword
         }
     }
 }
