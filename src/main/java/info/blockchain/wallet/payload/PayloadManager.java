@@ -621,7 +621,6 @@ public class PayloadManager {
     }
 
     /**
-     * // TODO: 22/12/2016 moved here from android. Could benefit from a refactor
      * Sets a private key for a {@link LegacyAddress}
      *
      * @param key            The {@link ECKey} for the address
