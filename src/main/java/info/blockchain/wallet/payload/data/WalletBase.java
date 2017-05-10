@@ -84,11 +84,14 @@ public class WalletBase {
     public void decryptPayload(@Nonnull String password)
         throws DecryptionException, IOException, InvalidCipherTextException, UnsupportedVersionException, MnemonicLengthException, MnemonicWordException, MnemonicChecksumException, DecoderException {
 
+        Wallet walletBody = null;
         if (!isV1Wallet()) {
             walletBody = decryptV3Wallet(password);
         } else {
             walletBody =  decryptV1Wallet(password);
         }
+
+        this.walletBody = walletBody;
     }
 
     private Wallet decryptV3Wallet(String password)
