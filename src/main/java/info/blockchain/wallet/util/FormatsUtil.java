@@ -1,8 +1,7 @@
 package info.blockchain.wallet.util;
 
 import info.blockchain.wallet.api.PersistentUrls;
-import java.nio.ByteBuffer;
-import java.util.regex.Pattern;
+
 import org.bitcoinj.core.Address;
 import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.Base58;
@@ -16,6 +15,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.web3j.crypto.Hash;
 import org.web3j.utils.Numeric;
+
+import java.nio.ByteBuffer;
+import java.util.regex.Pattern;
 
 public class FormatsUtil {
 
@@ -291,18 +293,23 @@ public class FormatsUtil {
             return false;
         } else {
             try {
-                CashAddress.decode(address);
-                return true;
-            } catch (AddressFormatException e) {
+                try {
+                    CashAddress.decode(address);
+                    return true;
+                } catch (AddressFormatException e) {
 
-                if (address.startsWith(networkParameters.getBech32AddressPrefix())) {
-                    return false;
-                } else {
-                    return isValidBitcoinCashAddress(networkParameters,
-                        networkParameters.getBech32AddressPrefix() +
-                            (char)(networkParameters.getBech32AddressSeparator()) +
-                            address);
+                    if (address.startsWith(networkParameters.getBech32AddressPrefix())) {
+                        return false;
+                    } else {
+                        return isValidBitcoinCashAddress(networkParameters,
+                                networkParameters.getBech32AddressPrefix() +
+                                        (char) (networkParameters.getBech32AddressSeparator()) +
+                                        address);
+                    }
                 }
+            } catch (Exception e) {
+                e.printStackTrace();
+                return false;
             }
         }
     }
